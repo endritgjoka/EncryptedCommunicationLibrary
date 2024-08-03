@@ -35,7 +35,7 @@ class AuthController extends APIController
             ->first();
 
         if($existingUser){
-            return $this->respondWithError(__('auth.failed'), __('app.login.user_exists'));
+            return $this->respondWithError(__('auth.exists'), __('app.login.user_exists'));
         }
 
         $userData = User::create($data);

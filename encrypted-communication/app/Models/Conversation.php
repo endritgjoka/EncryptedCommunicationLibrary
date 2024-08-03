@@ -20,7 +20,7 @@ class Conversation extends Model
 
     public function recipient()
     {
-        return $this->morphTo();
+        return $this->belongsTo(User::class, 'recipient_id');
     }
     public function messages()
     {

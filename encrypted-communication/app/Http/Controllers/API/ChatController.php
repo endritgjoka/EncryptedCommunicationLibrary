@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Events\MessageEvent;
 use App\Http\Controllers\APIController;
-use App\Http\Requests\MessageRequest;
+use App\Http\Requests\API\MessageRequest;
 use App\Models\Conversation;
 use App\Models\ConversationMessage;
 use App\Models\Message;
 use App\Models\User;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
+use PhpParser\Node\Scalar\Int_;
 
 class ChatController extends APIController
 {
@@ -51,6 +54,7 @@ class ChatController extends APIController
                 'encrypted_content' => $encryptedContent,
                 'iv' => base64_encode($iv),
             ]);
+            $message->load('user');
 
             ConversationMessage::create([
                 'conversation_id' => $conversation1->id,
@@ -68,8 +72,15 @@ class ChatController extends APIController
                 $conversation2->increment('unread_messages');
             }
 
-            // broadcast(new MessageEvent($message, $recipient, $authenticatedUserId, 'private'))->toOthers();
-            // broadcast(new MessageEvent($message, $authenticatedUserId, $recipient, 'private'))->toOthers();
+            //$recipient should be an integer
+            $recipientId = is_object($recipient) ? $recipient->id : intval($recipient);
+
+            broadcast(new MessageEvent($message, $recipientId, $authenticatedUserId, 'private'))->toOthers();
+            broadcast(new MessageEvent($message, $authenticatedUserId, $recipientId, 'private'))->toOthers();
+
+
+            Log::info('Broadcast event:', ['message' => $message]);
+
 
             return $this->respondWithSuccess($message, __('app.message.success'));
         } catch (Exception $e) {
@@ -90,7 +101,7 @@ class ChatController extends APIController
         $conversation = Conversation::where('sender_id', $authUserId)
             ->where('recipient_id', $recipient)->first();
         if (!$conversation) {
-            return $this->respondWithSuccess(null, __('app.conversation.not_found'), 404);
+            return $this->respondWithSuccess([], __('app.conversation.empty'), 200);
         }
         $conversationId = $conversation->id;
         $messages = Message::whereHas('conversations', function ($query) use ($conversationId) {
@@ -107,14 +118,24 @@ class ChatController extends APIController
         $user = auth()->user();
         $conversations = Conversation::where('sender_id', $user->id)
             ->where('type', 'private')
+            ->with('recipient')
             ->with(['lastMessage.message.user'])
             ->get()
             ->map(function ($conversation) {
-                if ($conversation->lastMessage) {
-                    $conversation->message = $conversation->lastMessage->message;
-                    unset($conversation->lastMessage);
+                $lastMessage = null;
+                if ($conversation) {
+                    $lastMessage = $conversation->lastMessage->message->load('user');
                 }
-                return $conversation;
+
+                $recipient = $conversation->recipient;
+                unset($conversation->lastMessage);
+                unset($conversation->recipient);
+
+                return [
+                    'conversation' => $conversation,
+                    'last_message' => $lastMessage,
+                    'recipient' => $recipient
+                ];
             });
 
         return $this->respondWithSuccess($conversations, __('app.conversations.success'));
