@@ -13,7 +13,7 @@ class SearchController extends APIController
     {
         $authenticatedUserId = auth()->user()->id;
 
-        $users = User::where('full_name', 'LIKE', "%$query%")->get();
+        $users = User::where('id','!=',$authenticatedUserId)->where('full_name', 'LIKE', "%$query%")->get();
 
         $users = $users->map(function ($user) use ($authenticatedUserId) {
             $conversation = Conversation::where('sender_id', $authenticatedUserId)

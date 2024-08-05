@@ -123,7 +123,7 @@ class ChatController extends APIController
             ->get()
             ->map(function ($conversation) {
                 $lastMessage = null;
-                if ($conversation) {
+                if ($conversation && $conversation->lastMessage) {
                     $lastMessage = $conversation->lastMessage->message->load('user');
                 }
 
@@ -136,10 +136,30 @@ class ChatController extends APIController
                     'last_message' => $lastMessage,
                     'recipient' => $recipient
                 ];
+            })
+            ->sortByDesc(function ($conversation) {
+                return $conversation['last_message'] ? $conversation['last_message']->created_at : null;
             });
 
-        return $this->respondWithSuccess($conversations, __('app.conversations.success'));
+        return $this->respondWithSuccess($conversations->values()->all(), __('app.conversations.success'));
     }
 
+
+
+    function markConversationAsRead($recipient): JsonResponse
+    {
+        $authenticatedUserId = auth()->user()->id;
+
+        $conversation = Conversation::where('sender_id', $authenticatedUserId)
+            ->where('recipient_id', $recipient)
+            ->first();
+        if (!$conversation) {
+            return $this->respondWithError(null, __('app.conversation.not_found'), 404);
+        }
+        $conversation->unread_messages = 0;
+        $conversation->update();
+
+        return $this->respondWithSuccess($conversation, __('app.conversation_read.success'));
+    }
 
 }
