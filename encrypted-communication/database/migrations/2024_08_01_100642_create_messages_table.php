@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('messages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users');
-            $table->string('encryption_key');
+            $table->text('encryption_key');
             $table->string('iv');
             $table->string('encrypted_content');
             $table->string('type')->default('text');
