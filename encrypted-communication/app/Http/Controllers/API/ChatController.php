@@ -12,18 +12,12 @@ use App\Models\Message;
 use App\Models\User;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use PhpParser\Node\Scalar\Int_;
 
 class ChatController extends APIController
 {
-    protected $encryptionService;
-
-    public function __construct(EncryptionService $encryptionService)
-    {
-        parent::__construct();
-        $this->encryptionService = $encryptionService;
-    }
 
     function sendMessage(MessageRequest $request, $recipient): JsonResponse
     {
@@ -48,8 +42,9 @@ class ChatController extends APIController
 
         $messageContent = $data['message'];
         $generatedKey = $this->generateEncryptionKey(); //128, 192, or 256
-        $encryptionKey = $this->encryptionService->encryptKey($generatedKey);
+        $encryptionKey = $this->encryptKey($generatedKey);
         $cipher = 'aes-256-cbc'; //'aes-128-cbc', 'aes-192-cbc', or 'aes-256-cbc'
+//        Log::info('Generated Key: ' . $generatedKey);
         try {
             $iv = random_bytes(openssl_cipher_iv_length($cipher));
             $encryptedContent = openssl_encrypt($messageContent, $cipher, $encryptionKey, 0, $iv);
@@ -88,9 +83,7 @@ class ChatController extends APIController
             broadcast(new MessageEvent($message, $recipientId, $authenticatedUserId, 'private'))->toOthers();
             broadcast(new MessageEvent($message, $authenticatedUserId, $recipientId, 'private'))->toOthers();
 
-
-            Log::info('Broadcast event:', ['message' => $message]);
-
+//            Log::info('Broadcast event:', ['message' => $message]);
 
             return $this->respondWithSuccess($message, __('app.message.success'));
         } catch (Exception $e) {
@@ -120,9 +113,8 @@ class ChatController extends APIController
             $query->where('conversation_id', $conversationId);
         })->with('user')->get();
 
-        // Decrypt each message content
         foreach ($messages as $message) {
-            $message->content = $this->encryptionService->decryptKey($message->content);
+            $message->encryption_key = $this->decryptKey($message->encryption_key);
         }
 
         return $this->respondWithSuccess($messages, __('app.message.success'));
@@ -142,7 +134,7 @@ class ChatController extends APIController
                 if ($conversation && $conversation->lastMessage) {
                     $lastMessage = $conversation->lastMessage->message->load('user');
                     if ($lastMessage) {
-                        $lastMessage->content =$this->encryptionService->decryptKey($lastMessage->content);
+                        $lastMessage->content =$this->decryptKey($lastMessage->content);
                     }
                 }
 
@@ -178,6 +170,16 @@ class ChatController extends APIController
         $conversation->update();
 
         return $this->respondWithSuccess($conversation, __('app.conversation_read.success'));
+    }
+
+    public function encryptKey($key)
+    {
+        return Crypt::encryptString($key);
+    }
+
+    public function decryptKey($encryptedKey)
+    {
+        return Crypt::decryptString($encryptedKey);
     }
 
 }
