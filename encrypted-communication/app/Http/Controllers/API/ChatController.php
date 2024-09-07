@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Events\MessageEvent;
 use App\Http\Controllers\APIController;
 use App\Http\Requests\API\MessageRequest;
+use App\Http\Services\EncryptionService;
 use App\Models\Conversation;
 use App\Models\ConversationMessage;
 use App\Models\Message;
@@ -16,6 +17,14 @@ use PhpParser\Node\Scalar\Int_;
 
 class ChatController extends APIController
 {
+    protected $encryptionService;
+
+    public function __construct(EncryptionService $encryptionService)
+    {
+        parent::__construct();
+        $this->encryptionService = $encryptionService;
+    }
+
     function sendMessage(MessageRequest $request, $recipient): JsonResponse
     {
         $authenticatedUserId = auth()->user()->id;
@@ -38,11 +47,12 @@ class ChatController extends APIController
         );
 
         $messageContent = $data['message'];
-        $encryptionKey = $this->generateEncryptionKey();
-
+        $generatedKey = $this->generateEncryptionKey(); //128, 192, or 256
+        $encryptionKey = $this->encryptionService->encryptKey($generatedKey);
+        $cipher = 'aes-256-cbc'; //'aes-128-cbc', 'aes-192-cbc', or 'aes-256-cbc'
         try {
-            $iv = random_bytes(openssl_cipher_iv_length('aes-256-cbc'));
-            $encryptedContent = openssl_encrypt($messageContent, 'aes-256-cbc', base64_decode($encryptionKey), 0, $iv);
+            $iv = random_bytes(openssl_cipher_iv_length($cipher));
+            $encryptedContent = openssl_encrypt($messageContent, $cipher, $encryptionKey, 0, $iv);
 
             if ($encryptedContent === false) {
                 throw new Exception("Encryption failed");
@@ -89,9 +99,9 @@ class ChatController extends APIController
     }
 
     // AES-256 (256-bit key) generator
-    function generateEncryptionKey()
+    function generateEncryptionKey($bits = 256)
     {
-        return base64_encode(random_bytes(32));
+        return base64_encode(random_bytes($bits / 8));
     }
 
 
@@ -100,18 +110,25 @@ class ChatController extends APIController
         $authUserId = auth()->user()->id;
         $conversation = Conversation::where('sender_id', $authUserId)
             ->where('recipient_id', $recipient)->first();
+
         if (!$conversation) {
             return $this->respondWithSuccess([], __('app.conversation.empty'), 200);
         }
+
         $conversationId = $conversation->id;
         $messages = Message::whereHas('conversations', function ($query) use ($conversationId) {
             $query->where('conversation_id', $conversationId);
-        })->with('user')
-            ->get();
+        })->with('user')->get();
+
+        // Decrypt each message content
+        foreach ($messages as $message) {
+            $message->content = $this->encryptionService->decryptKey($message->content);
+        }
 
         return $this->respondWithSuccess($messages, __('app.message.success'));
-
     }
+
+    use Illuminate\Support\Facades\Crypt;
 
     function getConversations(): JsonResponse
     {
@@ -125,6 +142,9 @@ class ChatController extends APIController
                 $lastMessage = null;
                 if ($conversation && $conversation->lastMessage) {
                     $lastMessage = $conversation->lastMessage->message->load('user');
+                    if ($lastMessage) {
+                        $lastMessage->content =$this->encryptionService->decryptKey($lastMessage->content);
+                    }
                 }
 
                 $recipient = $conversation->recipient;
@@ -143,7 +163,6 @@ class ChatController extends APIController
 
         return $this->respondWithSuccess($conversations->values()->all(), __('app.conversations.success'));
     }
-
 
 
     function markConversationAsRead($recipient): JsonResponse
