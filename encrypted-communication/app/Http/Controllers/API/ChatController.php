@@ -128,7 +128,6 @@ class ChatController extends APIController
         return $this->respondWithSuccess($messages, __('app.message.success'));
     }
 
-    use Illuminate\Support\Facades\Crypt;
 
     function getConversations(): JsonResponse
     {
