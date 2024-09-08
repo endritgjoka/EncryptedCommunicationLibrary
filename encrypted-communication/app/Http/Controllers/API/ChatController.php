@@ -52,7 +52,7 @@ class ChatController extends APIController
                 throw new Exception("Encryption failed");
             }
             $encryptedKey = $this->encryptKey(base64_encode($generatedKey));
-            
+
             $message = Message::create([
                 'user_id' => $authenticatedUserId,
                 'encryption_key' => $encryptedKey,
@@ -60,7 +60,7 @@ class ChatController extends APIController
                 'iv' => base64_encode($iv),
             ]);
             $message->load('user');
-
+            $message->encryption_key = $generatedKey;
             ConversationMessage::create([
                 'conversation_id' => $conversation1->id,
                 'message_id' => $message->id
