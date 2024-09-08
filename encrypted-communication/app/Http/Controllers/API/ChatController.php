@@ -60,7 +60,7 @@ class ChatController extends APIController
                 'iv' => base64_encode($iv),
             ]);
             $message->load('user');
-            $message->encryption_key = $generatedKey;
+
             ConversationMessage::create([
                 'conversation_id' => $conversation1->id,
                 'message_id' => $message->id
@@ -80,8 +80,8 @@ class ChatController extends APIController
             //$recipient should be an integer
             $recipientId = is_object($recipient) ? $recipient->id : intval($recipient);
 
-            broadcast(new MessageEvent($message, $recipientId, $authenticatedUserId, 'private'))->toOthers();
-            broadcast(new MessageEvent($message, $authenticatedUserId, $recipientId, 'private'))->toOthers();
+            broadcast(new MessageEvent($message, $recipientId, $authenticatedUserId, 'private', $generatedKey))->toOthers();
+            broadcast(new MessageEvent($message, $authenticatedUserId, $recipientId, 'private', $generatedKey))->toOthers();
 
 //            Log::info('Broadcast event:', ['message' => $message]);
 

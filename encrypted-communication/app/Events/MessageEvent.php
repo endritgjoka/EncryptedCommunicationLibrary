@@ -19,16 +19,19 @@ class MessageEvent implements ShouldBroadcast
     public $recipientId;
     public $otherUser;
     public $conversationType;
+    public $encryptionKey;
+
 
     /**
      * Create a new event instance.
      */
-    public function __construct(Message $message, $recipientId, $otherUser, $conversationType)
+    public function __construct(Message $message, $recipientId, $otherUser, $conversationType, $encryptionKey)
     {
         $this->message = $message;
         $this->recipientId = $recipientId;
         $this->otherUser = $otherUser;
         $this->conversationType = $conversationType;
+        $this->encryptionKey = $encryptionKey;
     }
 
     public function broadcastOn()
@@ -42,7 +45,8 @@ class MessageEvent implements ShouldBroadcast
         return [
             'other_user_id' => $this->otherUser,
             'message' => $this->message,
-            'conversation_type' => $this->conversationType
+            'conversation_type' => $this->conversationType,
+            'encryption_key' => $this->encryptionKey
         ];
     }
 
