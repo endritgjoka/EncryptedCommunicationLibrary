@@ -41,21 +41,21 @@ class ChatController extends APIController
         );
 
         $messageContent = $data['message'];
-        $generatedKey = $this->generateEncryptionKey(); //128, 192, or 256
-        $encryptionKey = $this->encryptKey($generatedKey);
+        $generatedKey = $this->generateEncryptionKey(); // 128, 192, or 256 bits
         $cipher = 'aes-256-cbc'; //'aes-128-cbc', 'aes-192-cbc', or 'aes-256-cbc'
-//        Log::info('Generated Key: ' . $generatedKey);
+//        Log::info('Key: ' . $generatedKey);
         try {
             $iv = random_bytes(openssl_cipher_iv_length($cipher));
-            $encryptedContent = openssl_encrypt($messageContent, $cipher, $encryptionKey, 0, $iv);
+            $encryptedContent = openssl_encrypt($messageContent, $cipher, base64_decode($generatedKey), 0, $iv);
 
             if ($encryptedContent === false) {
                 throw new Exception("Encryption failed");
             }
-
+            $encryptedKey = $this->encryptKey(base64_encode($generatedKey));
+            
             $message = Message::create([
                 'user_id' => $authenticatedUserId,
-                'encryption_key' => $encryptionKey,
+                'encryption_key' => $encryptedKey,
                 'encrypted_content' => $encryptedContent,
                 'iv' => base64_encode($iv),
             ]);
@@ -114,7 +114,7 @@ class ChatController extends APIController
         })->with('user')->get();
 
         foreach ($messages as $message) {
-            $message->encryption_key = $this->decryptKey($message->encryption_key);
+            $message->encryption_key = base64_decode($this->decryptKey($message->encryption_key));
         }
 
         return $this->respondWithSuccess($messages, __('app.message.success'));
@@ -134,7 +134,7 @@ class ChatController extends APIController
                 if ($conversation && $conversation->lastMessage) {
                     $lastMessage = $conversation->lastMessage->message->load('user');
                     if ($lastMessage) {
-                        $lastMessage->encryption_key =$this->decryptKey($lastMessage->encryption_key);
+                        $lastMessage->encryption_key = base64_decode($this->decryptKey($lastMessage->encryption_key));
                     }
                 }
 
@@ -174,12 +174,19 @@ class ChatController extends APIController
 
     public function encryptKey($key)
     {
-        return Crypt::encryptString($key);
+        $encryptedKey = Crypt::encryptString($key);
+        // Debug the length of the encrypted key
+        Log::info('Encrypted Key Length: ' . strlen($encryptedKey));
+        return $encryptedKey;
     }
 
     public function decryptKey($encryptedKey)
     {
-        return Crypt::decryptString($encryptedKey);
+        $key = Crypt::decryptString($encryptedKey);
+        // Debug the length of the decrypted key
+        Log::info('Decrypted Key Length: ' . strlen($key));
+        return $key;
     }
+
 
 }
