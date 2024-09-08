@@ -134,7 +134,7 @@ class ChatController extends APIController
                 if ($conversation && $conversation->lastMessage) {
                     $lastMessage = $conversation->lastMessage->message->load('user');
                     if ($lastMessage) {
-                        $lastMessage->content =$this->decryptKey($lastMessage->content);
+                        $lastMessage->encryption_key =$this->decryptKey($lastMessage->encryption_key);
                     }
                 }
 
