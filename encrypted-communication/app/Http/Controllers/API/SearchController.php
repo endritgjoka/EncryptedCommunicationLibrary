@@ -30,8 +30,9 @@ class SearchController extends APIController
                 $lastMessage = $conversation->lastMessage;
 
                 if ($lastMessage->message) {
-                    $lastMessage->message->load('user');
-                    $lastMessage->message->encryption_key = base64_decode($this->decryptKey($lastMessage->message->encryption_key));
+                    $lastMessage = $lastMessage->message;
+                    $lastMessage->load('user');
+                    $lastMessage->encryption_key = base64_decode($this->decryptKey($lastMessage->encryption_key));
                 } else {
                     $lastMessage = null;
                 }
