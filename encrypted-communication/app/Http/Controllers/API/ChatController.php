@@ -178,7 +178,6 @@ class ChatController extends APIController
     public function encryptKey($key)
     {
         $encryptedKey = Crypt::encryptString($key);
-        // Debug the length of the encrypted key
         Log::info('Encrypted Key Length: ' . strlen($encryptedKey));
         return $encryptedKey;
     }
@@ -186,7 +185,6 @@ class ChatController extends APIController
     public function decryptKey($encryptedKey)
     {
         $key = Crypt::decryptString($encryptedKey);
-        // Debug the length of the decrypted key
         Log::info('Decrypted Key Length: ' . strlen($key));
         return $key;
     }
